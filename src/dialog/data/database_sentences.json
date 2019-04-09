@@ -1,0 +1,8 @@
+{
+  "sentences": [{
+      "interlocutor": "NAME",
+      "text": "Here's a sentence.",
+      "keywords": "word1, word2"
+    }
+  ]
+}
