@@ -12,7 +12,8 @@ StringList feed_senteces = new StringList();
 JSONObject database_json;
 JSONArray database_data;
 StringList database_sentences = new StringList();
-StringList databse_sentences_shuffle = new StringList();
+StringList database_keywords = new StringList();
+StringList database_sentences_shuffle = new StringList();
 IntList database_sequence = new IntList();
 int database_sentences_count = 0;
 int database_sequence_length = 120;
@@ -53,11 +54,11 @@ void display() {
       database_sentences_count = 0;
       database_sequence.shuffle();
       printDatabase("New sequence started..");
-      databse_sentences_shuffle.clear();
+      database_sentences_shuffle.clear();
       for (int i = 0; i < database_sentences.size(); i++) {
-        databse_sentences_shuffle.append(database_sentences.get(database_sequence.get(i)));
+        database_sentences_shuffle.append(database_sentences.get(database_sequence.get(i)));
       }
-      saveList(databse_sentences_shuffle, "shuffle");
+      saveList(database_sentences_shuffle, "shuffle");
     }
   }
   textAlign(LEFT, TOP);
@@ -69,12 +70,24 @@ void database() {
   database_data = database_json.getJSONArray("sentences");
   database_sentences.clear();
   database_sequence.clear();
+  database_keywords.clear();
 
   for (int i = 0; i < database_data.size(); i++) {
     JSONObject sentence = database_data.getJSONObject(i);
     String text = sentence.getString("text");
     database_sentences.append(text);
     database_sequence.append(i);
+
+    // Load keywords from database.
+    String keywords = sentence.getString("keywords");
+    String[] keyword = split(keywords, ", ");
+    for (int j = 0; j < keyword.length; j++) {
+      database_keywords.append(keyword[j]);
+    }
+  }
+  removeDublicates(database_keywords);
+  for (String keyword: database_keywords) {
+    println(keyword);
   }
 
   int result_cnt = 0;
@@ -112,18 +125,33 @@ void xml() { // Import RSS-feeds.
   feed = new RSS[feed_link.length];
   feed_senteces.clear();
 
-  int y = 0;
   for (int i = 0; i < feed.length; i++) {
     feed[i] = new RSS(feed_link[i]);
+    feed[i].load();
     feed[i].include(feed_inclusive);
     feed[i].exclude(feed_exclusive);
   }
 }
 
+StringList removeDublicates(StringList list) {
+  for (int i = 0; i < list.size(); i++) {
+    for (int j = i + 1; j < list.size(); j++) {
+      if (list.get(i).equals(list.get(j))) {
+        list.remove(j);
+        j--;
+      }
+    }
+  }
+  return list;
+}
+
 class RSS {
   XML feed;
+  XML[] titles, descriptions;
+
   String xml;
   String[] title, description, sentence;
+  StringList description_sentence = new StringList();
   StringList result = new StringList();
 
   JSONObject expression_replace;
@@ -134,11 +162,14 @@ class RSS {
   RSS(String xml) {
     this.xml = xml;
     feed = loadXML(xml);
+    titles = feed.getChildren("channel/item/title");
+    descriptions = feed.getChildren("channel/item/description");
 
     expression_replace_org.clear();
     expression_replace_new.clear();
     expression_replace = loadJSONObject("\\data\\feed_replace.json");
     expression_replace_data = expression_replace.getJSONArray("replace");
+
     for (int i = 0; i < expression_replace_data.size(); i++) {
       JSONObject data = expression_replace_data.getJSONObject(i);
       String data_org = data.getString("org");
@@ -148,14 +179,11 @@ class RSS {
     }
   }
 
-  void include(String[] feed_inclusive) {
-    XML[] titles = feed.getChildren("channel/item/title");
-    XML[] descriptions = feed.getChildren("channel/item/description");
-
+  void load() {
     sentence = new String[titles.length];
+    int pos_start, pos_end;
+    description_sentence.clear();
     result.clear();
-
-    int pos_sentence = 0, pos_sentence_save = 0;
 
     for (int i = 0; i < titles.length; i++) {
       title = new String[titles.length];
@@ -165,7 +193,8 @@ class RSS {
       description[i] = descriptions[i].getContent().replaceAll("\n", "");
 
       // Clean xml from html.
-      int pos_start = 0, pos_end = 0;
+      pos_start = 0;
+      pos_end = 0;
       for (int n = 0; n < 3; n++) {
         for (int j = 0; j < description[i].length(); j++) {
           if (description[i].charAt(j) == '<') {
@@ -181,71 +210,66 @@ class RSS {
           }
         }
       }
-      //println("\n>> Description " + i + ":\n   " + description[i]);
 
       // Replace specific expressions.
       for (int a = 0; a < expression_replace_org.size(); a++) {
         description[i] = description[i].replace(expression_replace_org.get(a), expression_replace_new.get(a));
       }
 
-      // Select all sentences with the keywords.
-      for (int j = 0; j < feed_inclusive.length; j++) {
-        if (description[i].contains(feed_inclusive[j])) {
-          int n = description[i].indexOf(feed_inclusive[j]);
-          pos_start = n;
-          pos_end = n;
-          while (pos_start > 0) {
-            pos_start--;
-            if (description[i].charAt(pos_start) == '.' || description[i].charAt(pos_start) == '!' || description[i].charAt(pos_start) == '?') {
-              break;
-            }
-          }
-          while (pos_end < description[i].length() - 1) {
-            pos_end++;
-            if (description[i].charAt(pos_end) == '.' || description[i].charAt(pos_end) == '!' || description[i].charAt(pos_end) == '?') {
-              break;
-            }
-          }
-
-          // Shift whitespace at the beginning.
-          if (pos_start != 0) {
-            sentence[i] = description[i].substring(pos_start + 1, pos_end + 1);
-          } else {
-            sentence[i] = description[i].substring(pos_start, pos_end + 1);
-          }
-          while (sentence[i].charAt(0) == ' ') {
-            pos_start++;
-            sentence[i] = description[i].substring(pos_start, pos_end + 1);
-          }
-
-          // Change first character to capital letter.
-          if (sentence[i].charAt(0) >= 96) {
-            char[] temp = new char[sentence[i].length()];
-            for (int t = 0; t < temp.length; t++) {
-              temp[t] = sentence[i].charAt(t);
-            }
-            temp[0] -= 32;
-            if (temp[0] < 65 || temp[0] > 122) {
-              char[] temp_shift = new char[temp.length - 1];
-              for (int u = 0; u < temp_shift.length; u++) {
-                temp_shift[u] = temp[u + 1];
-              }
-              sentence[i] = new String(temp_shift);
-            } else {
-              sentence[i] = new String(temp);
-            }
-          }
-
-          // Check for duplicate entries.
-          pos_sentence = description[i].indexOf(sentence[i]);
-          if (pos_sentence != pos_sentence_save && sentence[i].length() < database_sequence_length) {
-            //result.append(i + ": " + title[i] + " ::::: " + sentence[i]);
-            result.append(sentence[i]);
-          }
-          pos_sentence_save = pos_sentence;
+      // Split description in sentences.
+      pos_start = 0;
+      pos_end = 0;
+      while (pos_end < description[i].length() - 1) {
+        pos_end++;
+        if (description[i].charAt(pos_end) == '.' || description[i].charAt(pos_end) == '!' || description[i].charAt(pos_end) == '?') {
+          description_sentence.append(description[i].substring(pos_start, pos_end + 1));
+          pos_start = pos_end + 1;
         }
       }
     }
+
+    // Formatting sentences.
+    for (int i = 0; i < description_sentence.size(); i++) {
+
+      // Shift whitespace at the beginning.
+      pos_start = 0;
+      while (description_sentence.get(i).charAt(pos_start) == ' ') {
+        pos_start++;
+        description_sentence.set(i, description_sentence.get(i).substring(pos_start, description_sentence.get(i).length()));
+      }
+
+      // Change first character to capital letter.
+      if (description_sentence.get(i).charAt(0) >= 96) {
+        char[] temp = new char[description_sentence.get(i).length()];
+        for (int t = 0; t < temp.length; t++) {
+          temp[t] = description_sentence.get(i).charAt(t);
+        }
+        temp[0] -= 32;
+        if (temp[0] < 65 || temp[0] > 122) {
+          char[] temp_shift = new char[temp.length - 1];
+          for (int u = 0; u < temp_shift.length; u++) {
+            temp_shift[u] = temp[u + 1];
+          }
+          description_sentence.set(i, new String(temp_shift));
+        } else {
+          description_sentence.set(i, new String(temp));
+        }
+      }
+    }
+  }
+
+  void include(String[] feed_inclusive) {
+    // Set results.
+    for (String sentence: description_sentence) {
+      for (int i = 0; i < feed_inclusive.length; i++) {
+        if (sentence.contains(feed_inclusive[i]) && sentence.length() < database_sequence_length) {
+          result.append(sentence);
+        }
+      }
+    }
+
+    // Remove duplicates.
+    removeDublicates(result);
   }
 
   void exclude(String[] feed_exclusive) {
