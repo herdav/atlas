@@ -1,14 +1,17 @@
-// Dialog -------------------------------------
-// 
-// 
-// 
+/*  ATLAS/DIALOG --------------------------------------------------------------------------------------------------
+    Created 2019 by David Herren.                                                                                 /
+    https://davidherren.ch                                                                                        /
+    https://github.com/herdav/atlas                                                                               /
+    Licensed under the MIT License.                                                                               /
+    ---------------------------------------------------------------------------------------------------------------
+*/
 
-// RSS Feed --------------------------------------------
+// RSS FEED -------------------------------------------------------------------------------------------------------
 RSS[] feed;
 String[] feed_link, feed_inclusive, feed_exclusive;
 StringList feed_senteces = new StringList();
 
-// Database --------------------------------------------
+// DATABASE -------------------------------------------------------------------------------------------------------
 JSONObject database_json;
 JSONArray database_data;
 StringList database_sentences = new StringList();
@@ -16,12 +19,12 @@ StringList database_keywords = new StringList();
 StringList database_sentences_shuffle = new StringList();
 IntList database_sequence = new IntList();
 int database_sentences_count = 0;
-int database_sequence_length = 120;
+int database_sequence_length = 90;
 boolean database_shuffleAtStart = true;
 
-// Display ---------------------------------------------
+// DISPLAY --------------------------------------------------------------------------------------------------------
 PFont display_font;
-int display_textSize = 50;
+int display_textSize = 70;
 int display_count = 0, display_count_max = 300;
 
 void setup() {
@@ -65,6 +68,42 @@ void display() {
   text(database_sentences.get(database_sequence.get(database_sentences_count)), 50, 50);
 }
 
+void xml() { // Import RSS-feeds.
+  String[] feed_link = loadStrings("feed_links.txt");
+  String[] feed_inclusive = loadStrings("feed_inclusive.txt");
+  String[] feed_exclusive = loadStrings("feed_exclusive.txt");
+
+  StringList keywords = new StringList();
+  keywords.clear();
+
+  for (int i = 0; i < feed_inclusive.length; i++) {
+    keywords.append(feed_inclusive[i]);
+  }
+  for (int i = 0; i < database_keywords.size(); i++) {
+    keywords.append(database_keywords.get(i));
+  }
+  removeDublicates(keywords);
+  println("\n>> Keywords loaded..");
+  for (String keyword: keywords) {
+    println(keyword);
+  }
+
+  feed_inclusive = new String[keywords.size()];
+  for (int i = 0; i < feed_inclusive.length; i++) {
+    feed_inclusive[i] = keywords.get(i);
+  }
+
+  feed = new RSS[feed_link.length];
+  feed_senteces.clear();
+
+  for (int i = 0; i < feed.length; i++) {
+    feed[i] = new RSS(feed_link[i]);
+    feed[i].load();
+    feed[i].include(feed_inclusive);
+    feed[i].exclude(feed_exclusive);
+  }
+}
+
 void database() {
   database_json = loadJSONObject("\\data\\database_sentences.json");
   database_data = database_json.getJSONArray("sentences");
@@ -82,13 +121,12 @@ void database() {
     String keywords = sentence.getString("keywords");
     String[] keyword = split(keywords, ", ");
     for (int j = 0; j < keyword.length; j++) {
-      database_keywords.append(keyword[j]);
+      if (!keyword[j].equals("n/A")) {
+        database_keywords.append(keyword[j]);
+      }
     }
   }
   removeDublicates(database_keywords);
-  for (String keyword: database_keywords) {
-    println(keyword);
-  }
 
   int result_cnt = 0;
   for (int i = 0; i < feed.length; i++) {
@@ -105,7 +143,8 @@ void database() {
 void saveList(StringList list, String title) {
   String[] array = new String[list.size()];
   for (int i = 0; i < array.length; i++) {
-    array[i] = i + ": " + list.get(i);
+    //array[i] = i + ": " + list.get(i);
+    array[i] = list.get(i);
   }
   saveStrings("\\export\\" + title + ".txt", array);
 }
@@ -114,22 +153,6 @@ void printDatabase(String titel) {
   println("\n>> " + titel);
   for (int i = 0; i < database_sequence.size(); i++) {
     println(i + ": " + database_sentences.get(database_sequence.get(i)));
-  }
-}
-
-void xml() { // Import RSS-feeds.
-  String[] feed_link = loadStrings("feed_links.txt");
-  String[] feed_inclusive = loadStrings("feed_inclusive.txt");
-  String[] feed_exclusive = loadStrings("feed_exclusive.txt");
-
-  feed = new RSS[feed_link.length];
-  feed_senteces.clear();
-
-  for (int i = 0; i < feed.length; i++) {
-    feed[i] = new RSS(feed_link[i]);
-    feed[i].load();
-    feed[i].include(feed_inclusive);
-    feed[i].exclude(feed_exclusive);
   }
 }
 
@@ -210,12 +233,10 @@ class RSS {
           }
         }
       }
-
       // Replace specific expressions.
       for (int a = 0; a < expression_replace_org.size(); a++) {
         description[i] = description[i].replace(expression_replace_org.get(a), expression_replace_new.get(a));
       }
-
       // Split description in sentences.
       pos_start = 0;
       pos_end = 0;
@@ -230,16 +251,15 @@ class RSS {
 
     // Formatting sentences.
     for (int i = 0; i < description_sentence.size(); i++) {
-
       // Shift whitespace at the beginning.
       pos_start = 0;
       while (description_sentence.get(i).charAt(pos_start) == ' ') {
         pos_start++;
-        description_sentence.set(i, description_sentence.get(i).substring(pos_start, description_sentence.get(i).length()));
       }
+      description_sentence.set(i, description_sentence.get(i).substring(pos_start, description_sentence.get(i).length()));
 
       // Change first character to capital letter.
-      if (description_sentence.get(i).charAt(0) >= 96) {
+      if (description_sentence.get(i).charAt(0) > 96 && description_sentence.get(i).charAt(0) < 123) {
         char[] temp = new char[description_sentence.get(i).length()];
         for (int t = 0; t < temp.length; t++) {
           temp[t] = description_sentence.get(i).charAt(t);
@@ -263,12 +283,13 @@ class RSS {
     for (String sentence: description_sentence) {
       for (int i = 0; i < feed_inclusive.length; i++) {
         if (sentence.contains(feed_inclusive[i]) && sentence.length() < database_sequence_length) {
-          result.append(sentence);
+          if (sentence.charAt(0) >= 65 && sentence.charAt(0) <= 90) {
+            // Include only correct formated sentences.
+            result.append(sentence);
+          }
         }
       }
     }
-
-    // Remove duplicates.
     removeDublicates(result);
   }
 
