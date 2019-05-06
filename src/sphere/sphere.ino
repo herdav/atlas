@@ -14,6 +14,8 @@ int stp_cnt = 0;
 int stp_cnt_safe;
 int stp_steps_fast = 1;
 int stp_steps_slow = 1;
+int stp_steps_demo = 20;
+int stp_steps_demo_delay = 5000;
 int stp_speed_slow_set = 12;
 int stp_speed_fast_max = 20;
 int stp_speed_fast_min = stp_speed_slow_set;
@@ -32,10 +34,9 @@ Adafruit_DCMotor *FAN = AFMS.getMotor(1);
 int fan_speed = 255;
 
 // CONTROL ELEMENTS
-constexpr auto BTN_PIN_STRT = 13;
-constexpr auto BTN_PIN_STOP = 12;
-bool run_strt_btn, run_stop_btn;
-bool run_auto = false;
+constexpr auto TGL_PIN_AUTO = 13;
+constexpr auto TGL_PIN_DEMO = 12;
+bool run_auto, run_demo;
 int time_a, time_b, time_delta;
 
 // WLAN
@@ -74,8 +75,8 @@ void setup() {
 
 	udpSetup();
 
-	pinMode(BTN_PIN_STRT, INPUT);
-	pinMode(BTN_PIN_STOP, INPUT);
+	pinMode(TGL_PIN_AUTO, INPUT);
+	pinMode(TGL_PIN_DEMO, INPUT);
 
 	AFMS.begin();
 	FAN->setSpeed(fan_speed);
@@ -89,7 +90,7 @@ void loop() {
 	udp();
 	control();
 	stepper();
-	fan();
+	//fan();
 }
 
 void udpSetup() {
@@ -231,15 +232,8 @@ void control() {
 	time_b = millis();
 	time_delta = time_b - time_a;
 
-	run_strt_btn = digitalRead(BTN_PIN_STRT);  // start taster
-	run_stop_btn = digitalRead(BTN_PIN_STOP);  // stop taster
-
-	if (run_strt_btn == true && run_stop_btn == false && run_auto == false) {
-		run_auto = true;
-	}
-	if (run_strt_btn == false && run_stop_btn == true && run_auto == true) {
-		run_auto = false;
-	}
+	run_auto = digitalRead(TGL_PIN_AUTO);  // auto toggle switch
+	run_demo = digitalRead(TGL_PIN_DEMO);  // demo toggle switch
 }
 
 void stepper() {
@@ -254,7 +248,15 @@ void stepper() {
 		stp_yaw_rght = stp_cnt - stp_yaw;
 	}
 
-	if (run_auto == true) { // define direction and speed of rotation according to least steps
+	if (run_demo) {
+		STEPPER->setSpeed(stp_steps_demo);
+		STEPPER->step(stp_steps_demo, FORWARD, MICROSTEP);
+		stp_cnt += stp_steps_demo;
+		STEPPER->release();
+		delay(stp_steps_demo_delay);
+	}
+
+	if (run_auto) { // define direction and speed of rotation according to least steps
 		if (stp_yaw_left < stp_yaw_rght && stp_yaw_left > stp_tol) {
 			if (stp_yaw_left >= stp_speed_fast_lim) {
 				stp_speed_fast_set = stp_speed(stp_yaw_left);
@@ -285,7 +287,8 @@ void stepper() {
 			STEPPER->release();
 		}
 	}
-	else {
+
+	if (!run_demo && !run_auto) {
 		STEPPER->release();
 	}
 
@@ -306,7 +309,7 @@ void stepper() {
 }
 
 void fan() {
-	if (run_auto == true) {
+	if (run_auto || run_demo == true) {
 		FAN->run(FORWARD);
 	}
 	else {
