@@ -10,20 +10,25 @@
 // GEAR STEPPER MOTOR
 const int GER_COG = 600;
 const int STP_COG = 200;
-int stp_cnt = 0;
-int stp_cnt_safe;
+
 int stp_steps_fast = 1;
-int stp_steps_slow = 1;
-int stp_steps_demo = 20;
-int stp_steps_demo_delay = 5000;
-int stp_speed_slow_set = 12;
 int stp_speed_fast_max = 20;
-int stp_speed_fast_min = stp_speed_slow_set;
+int stp_speed_fast_min = 12;
 int stp_speed_fast_lim = 50;
 int stp_speed_fast_set = 0;
+float stp_speed_fast_incr;
+
+int stp_steps_slow = 1;
+int stp_speed_slow_set = 12;
+
+int stp_steps_demo = 50;
+int stp_speed_demo = 12;
+int stp_steps_demo_delay = 10000;
+
+int stp_cnt = 0;
+int stp_cnt_safe;
 int stp_tol = 6;
 int stp_yaw, stp_yaw_left, stp_yaw_rght;
-float stp_speed_fast_incr;
 float stp_rpm;
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -36,8 +41,15 @@ int fan_speed = 255;
 // CONTROL ELEMENTS
 constexpr auto TGL_PIN_AUTO = 13;
 constexpr auto TGL_PIN_DEMO = 12;
-bool run_auto, run_demo;
-int time_a, time_b, time_delta;
+
+unsigned long time, time_a, time_b, time_delta;
+unsigned long time_run = 60000;
+
+bool run_time = false;
+bool run_auto = false;
+bool run_demo = false;
+bool run_udp = false;
+bool run_fan = false;
 
 // WLAN
 int status = WL_IDLE_STATUS;
@@ -70,10 +82,11 @@ const int FCTR = 1;
 
 void setup() {
 	Serial.begin(9600);
-	IMU.begin();
-	delay(500);
-
-	udpSetup();
+	if (run_udp) {
+		IMU.begin();
+		delay(500);
+		udpSetup();
+	}
 
 	pinMode(TGL_PIN_AUTO, INPUT);
 	pinMode(TGL_PIN_DEMO, INPUT);
@@ -85,12 +98,16 @@ void setup() {
 }
 
 void loop() {
-	accelerometer();
-	data();
-	udp();
+	if (run_udp) {
+		accelerometer();
+		data();
+		udp();
+	}
 	control();
 	stepper();
-	//fan();
+	if (run_fan) {
+		fan();
+	}
 }
 
 void udpSetup() {
@@ -232,6 +249,17 @@ void control() {
 	time_b = millis();
 	time_delta = time_b - time_a;
 
+	time = millis();
+
+	if (time % time_run < 50) {
+		run_time = true;
+	}
+	else {
+		run_time = false;
+	}
+	Serial.println(time);
+	Serial.println(run_time);
+
 	run_auto = digitalRead(TGL_PIN_AUTO);  // auto toggle switch
 	run_demo = digitalRead(TGL_PIN_DEMO);  // demo toggle switch
 }
@@ -248,16 +276,15 @@ void stepper() {
 		stp_yaw_rght = stp_cnt - stp_yaw;
 	}
 
-	if (run_demo) {
-		STEPPER->setSpeed(stp_steps_demo);
+	if (run_demo && run_time) {
+		STEPPER->setSpeed(stp_speed_demo);
 		STEPPER->step(stp_steps_demo, FORWARD, MICROSTEP);
 		stp_cnt += stp_steps_demo;
 		STEPPER->release();
-		delay(stp_steps_demo_delay);
 	}
 
-	if (run_auto) { // define direction and speed of rotation according to least steps
-		if (stp_yaw_left < stp_yaw_rght && stp_yaw_left > stp_tol) {
+	if (run_auto) { 
+		if (stp_yaw_left < stp_yaw_rght && stp_yaw_left > stp_tol) { // define direction and speed of rotation according to least steps
 			if (stp_yaw_left >= stp_speed_fast_lim) {
 				stp_speed_fast_set = stp_speed(stp_yaw_left);
 				STEPPER->setSpeed(stp_speed_fast_set);
