@@ -19,13 +19,17 @@ StringList database_keywords = new StringList();
 StringList database_sentences_shuffle = new StringList();
 IntList database_sequence = new IntList();
 int database_sentences_count = 0;
-int database_sequence_length = 90;
+int database_sequence_length_max = 7;
+int database_sequence_length_min = 10;
+int database_sequence_words_min = 3;
 boolean database_shuffleAtStart = true;
 
 // DISPLAY --------------------------------------------------------------------------------------------------------
 PFont display_font;
-int display_textSize = 70;
-int display_count = 0, display_count_max = 300;
+int display_textSize = 80;
+int display_offset_x = 50;
+int display_offset_y = 800;
+int display_count = 0, display_count_max = 600;
 
 void setup() {
   //fullScreen();
@@ -65,7 +69,7 @@ void display() {
     }
   }
   textAlign(LEFT, TOP);
-  text(database_sentences.get(database_sequence.get(database_sentences_count)), 50, 50);
+  text(database_sentences.get(database_sequence.get(database_sentences_count)), display_offset_x, display_offset_y);
 }
 
 void xml() { // Import RSS-feeds.
@@ -101,6 +105,7 @@ void xml() { // Import RSS-feeds.
     feed[i].load();
     feed[i].include(feed_inclusive);
     feed[i].exclude(feed_exclusive);
+    feed[i].words();
   }
 }
 
@@ -181,6 +186,8 @@ class RSS {
   JSONArray expression_replace_data;
   StringList expression_replace_org = new StringList();
   StringList expression_replace_new = new StringList();
+
+  int words = 0;
 
   RSS(String xml) {
     this.xml = xml;
@@ -282,7 +289,7 @@ class RSS {
     // Set results.
     for (String sentence: description_sentence) {
       for (int i = 0; i < feed_inclusive.length; i++) {
-        if (sentence.contains(feed_inclusive[i]) && sentence.length() < database_sequence_length) {
+        if (sentence.contains(feed_inclusive[i]) && sentence.length() < database_sequence_length_max && sentence.length() > database_sequence_length_min) {
           if (sentence.charAt(0) >= 65 && sentence.charAt(0) <= 90) {
             // Include only correct formated sentences.
             result.append(sentence);
@@ -296,12 +303,31 @@ class RSS {
   void exclude(String[] feed_exclusive) {
     // Check for exclusive expressions.
     for (int i = result.size() - 1; i >= 0; i--) {
-      for (int m = 0; m < feed_exclusive.length; m++) {
-        if (result.get(i).contains(feed_exclusive[m])) {
-          //println(">> Removed: " + result.get(i));
+      for (int j = 0; j < feed_exclusive.length; j++) {
+        if (result.get(i).contains(feed_exclusive[j])) {
           result.remove(i);
           break;
         }
+      }
+    }
+    // Check for upper characters.
+    for (int i = result.size() - 1; i >= 0; i--) {
+      for (int j = 1; j < result.get(i).length() - 1; j++) {
+        if (result.get(i).charAt(j) < 97 && result.get(i).charAt(j) > 32 && result.get(i).charAt(j) != 111) {
+          result.remove(i);
+          break;
+        }
+      }
+    }
+  }
+
+  // Count words and remove short sentences.
+  void words() {
+    String[] results = result.array();
+    for (int i = results.length- 1; i >= 0; i--) {
+      String[] words = split(results[i], ' ');
+      if (words.length < database_sequence_words_min) {
+        result.remove(i);
       }
     }
   }
