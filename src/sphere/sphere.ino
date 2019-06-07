@@ -1,3 +1,11 @@
+/* ATLAS/SPHERE --------------------------------------------------------------------------------------------------
+	Created 2019 by David Herren.                                                                                 /
+	https://davidherren.ch                                                                                        /
+	https://github.com/herdav/atlas                                                                               /
+	Licensed under the MIT License.                                                                               /
+	---------------------------------------------------------------------------------------------------------------
+*/
+
 #include <Wire.h>
 #include <math.h>
 #include <Adafruit_MotorShield.h>
@@ -21,9 +29,8 @@ float stp_speed_fast_incr;
 int stp_steps_slow = 1;
 int stp_speed_slow_set = 12;
 
-int stp_steps_demo = 50;
+int stp_steps_demo = 20;
 int stp_speed_demo = 12;
-int stp_steps_demo_delay = 10000;
 
 int stp_cnt = 0;
 int stp_cnt_safe;
@@ -43,7 +50,7 @@ constexpr auto TGL_PIN_AUTO = 13;
 constexpr auto TGL_PIN_DEMO = 12;
 
 unsigned long time, time_a, time_b, time_delta;
-unsigned long time_run = 60000;
+unsigned long time_run = 20000;
 
 bool run_time = false;
 bool run_auto = false;
@@ -278,7 +285,7 @@ void stepper() {
 
 	if (run_demo && run_time) {
 		STEPPER->setSpeed(stp_speed_demo);
-		STEPPER->step(stp_steps_demo, FORWARD, MICROSTEP);
+		STEPPER->step(stp_steps_demo, FORWARD, SINGLE);
 		stp_cnt += stp_steps_demo;
 		STEPPER->release();
 	}
