@@ -19,7 +19,7 @@ StringList database_keywords = new StringList();
 StringList database_sentences_shuffle = new StringList();
 IntList database_sequence = new IntList();
 int database_sentences_count = 0;
-int database_sequence_length_max = 7;
+int database_sequence_length_max = 70;
 int database_sequence_length_min = 10;
 int database_sequence_words_min = 3;
 boolean database_shuffleAtStart = true;
@@ -32,8 +32,8 @@ int display_offset_y = 800;
 int display_count = 0, display_count_max = 600;
 
 void setup() {
-  //fullScreen();
-  size(3800, 500);
+  fullScreen();
+  //size(3800, 500);
   frameRate(60);
   background(0);
   display_font = createFont("Consolas", display_textSize);
@@ -50,29 +50,34 @@ void draw() {
 }
 
 void display() {
-  display_count++;
-  if (display_count == display_count_max) {
-    display_count = 0;
-    database_sentences_count++;
-    if (database_sentences_count == database_sequence.size() || database_shuffleAtStart) {
-      xml();
-      database();
-      database_shuffleAtStart = false;
-      database_sentences_count = 0;
-      database_sequence.shuffle();
-      printDatabase("New sequence started..");
-      database_sentences_shuffle.clear();
-      for (int i = 0; i < database_sentences.size(); i++) {
-        database_sentences_shuffle.append(database_sentences.get(database_sequence.get(i)));
+  if (keyCode == UP) { // 
+    text(database_sentences.get(7), display_offset_x, display_offset_y);
+  } else {
+    display_count++;
+    if (display_count == display_count_max) {
+      display_count = 0;
+      database_sentences_count++;
+      if (database_sentences_count == database_sequence.size() || database_shuffleAtStart) {
+        xml();
+        database();
+        database_shuffleAtStart = false;
+        database_sentences_count = 0;
+        database_sequence.shuffle();
+        printDatabase("New sequence started..");
+        database_sentences_shuffle.clear();
+        for (int i = 0; i < database_sentences.size(); i++) {
+          database_sentences_shuffle.append(database_sentences.get(database_sequence.get(i)));
+        }
+        saveList(database_sentences_shuffle, "shuffle");
       }
-      saveList(database_sentences_shuffle, "shuffle");
     }
+    textAlign(LEFT, TOP);
+    text(database_sentences.get(database_sequence.get(database_sentences_count)), display_offset_x, display_offset_y);
   }
-  textAlign(LEFT, TOP);
-  text(database_sentences.get(database_sequence.get(database_sentences_count)), display_offset_x, display_offset_y);
 }
 
-void xml() { // Import RSS-feeds.
+void xml() {
+  // Imports RSS-feeds.
   String[] feed_link = loadStrings("feed_links.txt");
   String[] feed_inclusive = loadStrings("feed_inclusive.txt");
   String[] feed_exclusive = loadStrings("feed_exclusive.txt");
@@ -122,7 +127,7 @@ void database() {
     database_sentences.append(text);
     database_sequence.append(i);
 
-    // Load keywords from database.
+    // Loads keywords from database.
     String keywords = sentence.getString("keywords");
     String[] keyword = split(keywords, ", ");
     for (int j = 0; j < keyword.length; j++) {
@@ -139,7 +144,6 @@ void database() {
       result_cnt++;
       database_sentences.append(feed[i].result.get(j));
       database_sequence.append(database_data.size() + result_cnt - 1);
-      //println(database_data.size() + result_cnt, feed[i].result.get(j));
     }
   }
   saveList(database_sentences, "database");
@@ -148,7 +152,6 @@ void database() {
 void saveList(StringList list, String title) {
   String[] array = new String[list.size()];
   for (int i = 0; i < array.length; i++) {
-    //array[i] = i + ": " + list.get(i);
     array[i] = list.get(i);
   }
   saveStrings("\\export\\" + title + ".txt", array);
@@ -222,7 +225,7 @@ class RSS {
       description = new String[descriptions.length];
       description[i] = descriptions[i].getContent().replaceAll("\n", "");
 
-      // Clean xml from html.
+      // Cleans xml from html.
       pos_start = 0;
       pos_end = 0;
       for (int n = 0; n < 3; n++) {
@@ -240,11 +243,11 @@ class RSS {
           }
         }
       }
-      // Replace specific expressions.
+      // Replaces specific expressions.
       for (int a = 0; a < expression_replace_org.size(); a++) {
         description[i] = description[i].replace(expression_replace_org.get(a), expression_replace_new.get(a));
       }
-      // Split description in sentences.
+      // Splits description in sentences.
       pos_start = 0;
       pos_end = 0;
       while (pos_end < description[i].length() - 1) {
@@ -256,16 +259,16 @@ class RSS {
       }
     }
 
-    // Formatting sentences.
+    // Formats sentences.
     for (int i = 0; i < description_sentence.size(); i++) {
-      // Shift whitespace at the beginning.
+      // Shifts whitespace at the beginning.
       pos_start = 0;
       while (description_sentence.get(i).charAt(pos_start) == ' ') {
         pos_start++;
       }
       description_sentence.set(i, description_sentence.get(i).substring(pos_start, description_sentence.get(i).length()));
 
-      // Change first character to capital letter.
+      // Changes first character to capital letter.
       if (description_sentence.get(i).charAt(0) > 96 && description_sentence.get(i).charAt(0) < 123) {
         char[] temp = new char[description_sentence.get(i).length()];
         for (int t = 0; t < temp.length; t++) {
@@ -286,7 +289,7 @@ class RSS {
   }
 
   void include(String[] feed_inclusive) {
-    // Set results.
+    // Sets results.
     for (String sentence: description_sentence) {
       for (int i = 0; i < feed_inclusive.length; i++) {
         if (sentence.contains(feed_inclusive[i]) && sentence.length() < database_sequence_length_max && sentence.length() > database_sequence_length_min) {
@@ -301,7 +304,7 @@ class RSS {
   }
 
   void exclude(String[] feed_exclusive) {
-    // Check for exclusive expressions.
+    // Checks for exclusive expressions.
     for (int i = result.size() - 1; i >= 0; i--) {
       for (int j = 0; j < feed_exclusive.length; j++) {
         if (result.get(i).contains(feed_exclusive[j])) {
@@ -310,7 +313,7 @@ class RSS {
         }
       }
     }
-    // Check for upper characters.
+    // Checks for upper characters.
     for (int i = result.size() - 1; i >= 0; i--) {
       for (int j = 1; j < result.get(i).length() - 1; j++) {
         if (result.get(i).charAt(j) < 97 && result.get(i).charAt(j) > 32 && result.get(i).charAt(j) != 111) {
@@ -321,10 +324,10 @@ class RSS {
     }
   }
 
-  // Count words and remove short sentences.
   void words() {
+    // Counts words and removes short sentences.
     String[] results = result.array();
-    for (int i = results.length- 1; i >= 0; i--) {
+    for (int i = results.length - 1; i >= 0; i--) {
       String[] words = split(results[i], ' ');
       if (words.length < database_sequence_words_min) {
         result.remove(i);
