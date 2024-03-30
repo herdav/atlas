@@ -1,3 +1,3 @@
 # atlas
 
-[Website](https://www.davidherren.ch/?atlas=en)
+[Website](https://www.davidherren.ch/en/atlas)
